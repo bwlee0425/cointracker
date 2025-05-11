@@ -1,0 +1,12 @@
+/* src/styles/hover.css */
+
+/* Hover and active effects */
+.panel {
+    transition: all 0.3s ease-in-out;
+  }
+  
+  .panel:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+  

@@ -1,0 +1,60 @@
+/* src/styles/panelThemes.css */
+
+/* 패널의 기본 스타일 */
+.panel {
+    border-radius: 8px; 
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  /* 패널을 드래그하거나 리사이즈할 때 효과 */
+  .panel:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* 각 패널별 색상 */
+  .bg-fundingRate {
+    background-color: #0e4b9b; /* FundingRate 색상 */
+    color: white;
+  }
+  
+  .bg-orderBook {
+    background-color: #333333; /* OrderBook 색상 */
+    color: white;
+  }
+  
+  .bg-liquidation {
+    background-color: #bc2d46; /* Liquidation 색상 */
+    color: white;
+  }
+  
+  .bg-tradeVolume {
+    background-color: #34d399; /* TradeVolume 색상 */
+    color: black;
+  }
+  
+  .bg-symbolSelector {
+    background-color: #f97316; /* SymbolSelector 색상 */
+    color: white;
+  }
+  
+  /* 패널 내 아이템 스타일 */
+  .panel .panel-header {
+    font-size: 18px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-bottom: 1px solid #ddd;
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  .panel .panel-content {
+    padding: 12px;
+    overflow: auto;
+  }
+  
+  /* 패널 사이의 여백 */
+  .panel + .panel {
+    margin-top: 20px;
+  }
+  

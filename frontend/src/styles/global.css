@@ -1,0 +1,96 @@
+/* src/styles/global.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Your other global styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: white; /* Light mode 기본 배경 */
+  color: black; /* Light mode 기본 텍스트 색상 */
+  transition: background-color 0.3s ease, color 0.3s ease; /* 부드러운 전환 효과 */
+}
+
+body.dark {
+  background-color: #121212; /* Dark mode 배경 */
+  color: white; /* Dark mode 텍스트 색상 */
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  color: inherit; /* 부모 요소의 색상 상속 */
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  color: inherit; /* 부모 요소의 색상 상속 */
+}
+
+input, select, textarea {
+  border: 1px solid #ccc;
+  padding: 8px;
+  border-radius: 4px;
+  color: inherit; /* 부모 요소의 색상 상속 */
+  background-color: white; /* Light mode 배경 */
+  transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark input, .dark select, .dark textarea {
+  border-color: #555;
+  background-color: #333;
+}
+
+.panel {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease;
+  padding: 12px;
+  background-color: white; /* Light mode 배경 */
+  color: black; /* Light mode 텍스트 색상 */
+}
+
+.dark .panel {
+  background-color: #1e1e1e; /* Dark mode 배경 */
+  color: white; /* Dark mode 텍스트 색상 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.panel:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.dark .panel:hover {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* App Container 스타일 (Footer를 아래로 밀기 위해) */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+footer {
+  margin-top: auto;
+  padding: 20px;
+  text-align: center;
+  border-top: 1px solid #ccc;
+  color: #555; /* Light mode footer text color */
+  background-color: #f8f8f8; /* Light mode footer background */
+  transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark footer {
+  border-top-color: #555;
+  color: #aaa; /* Dark mode footer text color */
+  background-color: #222; /* Dark mode footer background */
+}

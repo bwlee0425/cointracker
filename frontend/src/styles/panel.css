@@ -1,0 +1,34 @@
+/* src/styles/panel.css */
+
+/* Panel styling */
+.panel {
+    background-color: #1f1f1f;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease;
+  }
+  
+  .panel:hover {
+    transform: translateY(-5px); /* Hover effect */
+  }
+  
+  .panel-header {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #f97316; /* Highlight color */
+    margin-bottom: 10px;
+  }
+  
+  .panel-content {
+    font-size: 1rem;
+    color: #d1d5db; /* Lighter text for readability */
+  }
+  
+  .panel-footer {
+    text-align: right;
+    margin-top: 10px;
+    font-size: 0.875rem;
+    color: #888;
+  }
+  
