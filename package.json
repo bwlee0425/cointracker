@@ -1,0 +1,30 @@
+{
+  "name": "cointracker",
+  "version": "1.0.0",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix frontend\" \"tsup --watch\"",
+    "build": "npm run build:frontend && npm run build:electron && electron-builder",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:electron": "tsup",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^36.2.0",
+    "electron-builder": "^26.0.12",
+    "tsup": "^8.4.0",
+    "typescript": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.example.cointracker",
+    "files": [
+      "dist-electron/",
+      "frontend/dist/"
+    ],
+    "mac": {
+      "target": "dmg",
+      "defaultArch": "arm64"
+    }
+  }
+}
