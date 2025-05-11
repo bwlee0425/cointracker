@@ -191,3 +191,4 @@ docker-compose.yml
 process_by_mem.txt
 supervisord.md
 tmuxall.md
+tsup.config.ts
