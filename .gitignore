@@ -175,7 +175,7 @@ cython_debug/
 node_modules
 node_modules
 
-# be
+# cointracker
 cypress/
 dist/
 dbdata/
@@ -183,3 +183,11 @@ dist-electron/
 electron/
 gpt/
 logs/
+
+# cointracker
+local_db_brew.md
+docker-compose copy_redis-stack-plus.yml
+docker-compose.yml
+process_by_mem.txt
+supervisord.md
+tmuxall.md
