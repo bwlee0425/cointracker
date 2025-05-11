@@ -174,3 +174,12 @@ cython_debug/
 .pypirc
 node_modules
 node_modules
+
+# be
+cypress/
+dist/
+dbdata/
+dist-electron/
+electron/
+gpt/
+logs/
