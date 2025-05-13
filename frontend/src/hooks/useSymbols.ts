@@ -1,23 +1,23 @@
-// src/hooks/useSymbols.ts
-import { useState, useEffect } from 'react';
+// hooks/useSymbols.ts
+import { useEffect } from 'react';
+import { useRecoilState } from 'recoil';
+import { symbolsAtom } from '../store/atoms';
 
-export const useSymbols = () => {
-  const [symbols, setSymbols] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
+export function useSymbols() {
+  const [symbols, setSymbols] = useRecoilState(symbolsAtom);
 
   useEffect(() => {
-    fetch('/api/symbols') // 실제 API 호출 URL
-      .then((res) => res.json())
-      .then((data) => {
+    async function fetchSymbols() {
+      try {
+        const res = await fetch('http://localhost:8000/api/symbols/');
+        const data = await res.json();
         setSymbols(data);
-        setLoading(false);
-      })
-      .catch((error) => {
-        setError('Error fetching symbols');
-        setLoading(false);
-      });
-  }, []);
+      } catch (err) {
+        console.error('Failed to fetch symbols:', err);
+      }
+    }
+    fetchSymbols();
+  }, [setSymbols]);
 
-  return { symbols, loading, error };
-};
+  return symbols;
+}

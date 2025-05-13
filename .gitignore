@@ -176,7 +176,6 @@ node_modules
 node_modules
 
 # cointracker
-cypress/
 dist/
 dbdata/
 dist-electron/

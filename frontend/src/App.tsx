@@ -6,17 +6,16 @@ import { useTheme } from './hooks/useTheme';
 import useRealtimeData from './hooks/useRealtimeData';
 import useHistoricalData from './hooks/useHistoricalData';
 import { useRecoilState } from 'recoil';
-import {
-  symbolsAtom,
-  selectedSymbolAtom,
-} from './store/atoms';
+import { selectedSymbolAtom } from './store/atoms';
+import { useSymbols } from './hooks/useSymbols'; // ✅ 추가
 import { PanelLayout } from './components/layout/PanelLayout';
 import Sidebar from './components/layout/Sidebar';
-import Header from './components/layout/Header'; // default import (중괄호 제거)
+import Header from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 
 const App: React.FC = () => {
-  const [, setSymbols] = useRecoilState(symbolsAtom);
+  useSymbols(); // ✅ symbols 불러오기 (setSymbols은 useSymbols 내부에서 처리됨)
+
   const [selectedSymbol] = useRecoilState(selectedSymbolAtom);
   const { error } = useRealtimeData(selectedSymbol);
   useHistoricalData();
@@ -35,7 +34,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="app-container min-h-screen w-screen bg-background text-foreground flex flex-col"> {/* className 추가 */}
+    <div className="app-container min-h-screen w-screen bg-background text-foreground flex flex-col">
       {/* Header 영역 */}
       <Header />
 

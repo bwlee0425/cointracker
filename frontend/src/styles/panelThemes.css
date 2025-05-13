@@ -31,7 +31,7 @@
   
   .bg-tradeVolume {
     background-color: #34d399; /* TradeVolume 색상 */
-    color: black;
+    color: rgb(250, 250, 250);
   }
   
   .bg-symbolSelector {

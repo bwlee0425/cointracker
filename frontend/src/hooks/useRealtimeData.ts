@@ -54,10 +54,10 @@ const useRealtimeData = (symbol: string = 'BTCUSDT') => {
                 ]);
 
                 // 디버깅 로그
-                console.log('Orderbook Response:', JSON.stringify(orderbookRes.data, null, 2));
-                console.log('FundingRate Response:', JSON.stringify(fundingRateRes.data, null, 2));
-                console.log('TradeVolume Response:', JSON.stringify(tradeVolumeRes.data, null, 2));
-                console.log('Liquidation Response:', JSON.stringify(liquidationRes.data, null, 2));
+                // console.log('Orderbook Response:', JSON.stringify(orderbookRes.data, null, 2));
+                // console.log('FundingRate Response:', JSON.stringify(fundingRateRes.data, null, 2));
+                // console.log('TradeVolume Response:', JSON.stringify(tradeVolumeRes.data, null, 2));
+                // console.log('Liquidation Response:', JSON.stringify(liquidationRes.data, null, 2));
 
                 const liquidationData = liquidationRes.data.last_liquidation
                     ? {
@@ -97,7 +97,7 @@ const useRealtimeData = (symbol: string = 'BTCUSDT') => {
                         : { last_liquidation: null, historicalLiquidation: [] },
                 };
 
-                console.log('New Realtime Data:', JSON.stringify(newRealtimeData, null, 2));
+                //console.log('New Realtime Data:', JSON.stringify(newRealtimeData, null, 2));
 
                 setRealtimeData(newRealtimeData);
                 setTradeVolume(newRealtimeData.tradeVolume);

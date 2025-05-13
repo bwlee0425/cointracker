@@ -4,8 +4,10 @@ from .views import (
     RealtimeOrderBookView, RealtimeFundingRateView, RealtimeTradeVolumeView, RealtimeLiquidationView,
     HistoricalOrderBookView, HistoricalFundingRateView, HistoricalTradeVolumeView, HistoricalLiquidationView
 )
+from . import views
 
 urlpatterns = [
+    path('symbols/', views.SymbolListView.as_view(), name='symbol-list'),
     path('realtime/orderbook/', RealtimeOrderBookView.as_view(), name='realtime_orderbook'),
     path('realtime/funding_rate/', RealtimeFundingRateView.as_view(), name='realtime_funding_rate'),
     path('realtime/trade_volume/', RealtimeTradeVolumeView.as_view(), name='realtime_trade_volume'),

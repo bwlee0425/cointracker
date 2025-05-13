@@ -8,6 +8,7 @@ from .models import OrderBook, FundingRate, TradeVolume, Liquidation
 from .serializers import OrderBookSerializer, FundingRateSerializer, TradeVolumeSerializer, LiquidationSerializer
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from datetime import datetime
+import requests
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL)
 
@@ -289,3 +290,9 @@ class DataStatusView(APIView):
                 return Response({"status": "warning", "message": "확인된 데이터가 없습니다."}, status=204)
         except redis.RedisError as e:
             return Response({"status": "error", "error": str(e)}, status=503)
+
+class SymbolListView(APIView):
+    def get(self, request):
+        res = requests.get('https://fapi.binance.com/fapi/v1/ticker/24hr')
+        symbols = [item['symbol'] for item in res.json() if item['symbol'].endswith('USDT')]
+        return Response(symbols)
