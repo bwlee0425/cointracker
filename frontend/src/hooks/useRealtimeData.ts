@@ -1,141 +1,143 @@
 // src/hooks/useRealtimeData.ts
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useRecoilState, useSetRecoilState, useRecoilValue } from 'recoil';
-import {
-    realtimeDataAtom,
-    tradeVolumeState,
-    orderbookDataAtom,
-    fundingRateState,
-    liquidationDataAtom,
-} from '@/store/atoms';
-import {
-    REALTIME_ORDERBOOK_URL,
-    REALTIME_FUNDING_RATE_URL,
-    REALTIME_TRADE_VOLUME_URL,
-    REALTIME_LIQUIDATION_URL,
-} from '@/constants';
-import {
-    OrderbookResponse,
-    FundingRateResponse,
-    TradeVolumeResponse,
-    LiquidationResponse,
-} from '@/types/api';
+import { useEffect, useState } from 'react';
+import { useRecoilState } from 'recoil';
+import { realtimeDataAtom } from '../store/atoms';
+import { useWebSocket } from './useWebSocket';
 
-interface RealtimeDataState {
-    loading: boolean;
-    error: string | null;
-    noLiquidationMessage: string;
+interface RealtimeData {
+  orderbook: {
+    bids: [number, number][];
+    asks: [number, number][];
+  } | null;
+  fundingRate: {
+    fundingRate: number;
+    fundingTime: string;
+  } | null;
+  tradeVolume: {
+    buy_volume: number;
+    sell_volume: number;
+    timestamp: string;
+  } | null;
+  liquidation: {
+    last_liquidation: any;
+    historicalLiquidation: any[];
+  } | null;
 }
 
-const initialState: RealtimeDataState = {
-    loading: true,
-    error: null,
-    noLiquidationMessage: '',
-};
+export default function useRealtimeData(selectedSymbols: string[]) {
+  const [realtimeData, setRealtimeData] = useRecoilState(realtimeDataAtom);
+  const [error, setError] = useState<string | null>(null);
 
-const useRealtimeData = (symbol: string = 'BTCUSDT') => {
-    const [state, setState] = useState(initialState);
-    const setRealtimeData = useSetRecoilState(realtimeDataAtom);
-    const setTradeVolume = useSetRecoilState(tradeVolumeState);
-    const setOrderbook = useSetRecoilState(orderbookDataAtom);
-    const setFundingRate = useSetRecoilState(fundingRateState);
-    const setLiquidation = useSetRecoilState(liquidationDataAtom);
+  const subscribeTopics = selectedSymbols.map((symbol) => `realtime_${symbol.toLowerCase()}`);
+  const { isConnected, messages } = useWebSocket('ws://localhost:8000/ws/realtime/', {
+    reconnectInterval: 3000,
+    pingInterval: 10000,
+    subscribeTopics,
+  });
 
-    useEffect(() => {
-        const fetchRealtimeData = async () => {
-            setState(prev => ({ ...prev, loading: true, error: null }));
-            try {
-                const [orderbookRes, fundingRateRes, tradeVolumeRes, liquidationRes] = await Promise.all([
-                    axios.get<OrderbookResponse>(`${REALTIME_ORDERBOOK_URL}?symbol=${symbol}`, { timeout: 5000 }),
-                    axios.get<FundingRateResponse>(`${REALTIME_FUNDING_RATE_URL}?symbol=${symbol}`, { timeout: 5000 }),
-                    axios.get<TradeVolumeResponse>(`${REALTIME_TRADE_VOLUME_URL}?symbol=${symbol}`, { timeout: 5000 }),
-                    axios.get<LiquidationResponse>(`${REALTIME_LIQUIDATION_URL}?symbol=${symbol}`, { timeout: 5000 }),
-                ]);
+  // WebSocket 메시지 처리
+  useEffect(() => {
+    if (!isConnected) return;
 
-                // 디버깅 로그
-                // console.log('Orderbook Response:', JSON.stringify(orderbookRes.data, null, 2));
-                // console.log('FundingRate Response:', JSON.stringify(fundingRateRes.data, null, 2));
-                // console.log('TradeVolume Response:', JSON.stringify(tradeVolumeRes.data, null, 2));
-                // console.log('Liquidation Response:', JSON.stringify(liquidationRes.data, null, 2));
+    messages.forEach((message) => {
+      const symbol = message.s;
+      if (!selectedSymbols.includes(symbol)) return;
 
-                const liquidationData = liquidationRes.data.last_liquidation
-                    ? {
-                          side: liquidationRes.data.last_liquidation.side || 'N/A',
-                          price: parseFloat(liquidationRes.data.last_liquidation.price || '0'),
-                          quantity: parseFloat(liquidationRes.data.last_liquidation.quantity || '0'),
-                          timestamp: liquidationRes.data.last_liquidation.timestamp || 'N/A',
-                      }
-                    : null;
-
-                const newRealtimeData = {
-                    orderbook: {
-                        b: (orderbookRes.data.b || []).map(([price, quantity]) => [
-                            parseFloat(price || '0'),
-                            parseFloat(quantity || '0'),
-                        ]),
-                        a: (orderbookRes.data.a || []).map(([price, quantity]) => [
-                            parseFloat(price || '0'),
-                            parseFloat(quantity || '0'),
-                        ]),
-                    },
-                    fundingRate: fundingRateRes.data
-                        ? {
-                              fundingRate: parseFloat(fundingRateRes.data.fundingRate || '0'),
-                              fundingTime: fundingRateRes.data.fundingTime || 'N/A',
-                          }
-                        : null,
-                    tradeVolume: tradeVolumeRes.data
-                        ? {
-                              buy_volume: parseFloat(tradeVolumeRes.data.buy_volume || '0'),
-                              sell_volume: parseFloat(tradeVolumeRes.data.sell_volume || '0'),
-                              timestamp: tradeVolumeRes.data.timestamp || '',
-                          }
-                        : null,
-                    liquidation: liquidationData
-                        ? { last_liquidation: liquidationData, historicalLiquidation: [] }
-                        : { last_liquidation: null, historicalLiquidation: [] },
-                };
-
-                //console.log('New Realtime Data:', JSON.stringify(newRealtimeData, null, 2));
-
-                setRealtimeData(newRealtimeData);
-                setTradeVolume(newRealtimeData.tradeVolume);
-                setOrderbook(newRealtimeData.orderbook);
-                setFundingRate(newRealtimeData.fundingRate);
-                setLiquidation(newRealtimeData.liquidation);
-
-                setState({
-                    loading: false,
-                    error: null,
-                    noLiquidationMessage: liquidationData ? '' : '실시간 청산 데이터가 없습니다.',
-                });
-            } catch (err: any) {
-                console.error('실시간 데이터 가져오기 오류:', {
-                    message: err.message,
-                    code: err.code,
-                    response: err.response?.data,
-                    url: err.config?.url,
-                });
-                setState(prev => ({
-                    ...prev,
-                    loading: false,
-                    error: `데이터 가져오기 실패: ${err.message}`,
-                }));
-            }
+      setRealtimeData((prev: Record<string, RealtimeData>) => {
+        const updatedData = { ...prev[symbol] } || {
+          orderbook: null,
+          fundingRate: null,
+          tradeVolume: null,
+          liquidation: null,
         };
 
-        fetchRealtimeData();
-        const interval = setInterval(fetchRealtimeData, 5000);
-        return () => clearInterval(interval);
-    }, [symbol, setRealtimeData, setTradeVolume, setOrderbook, setFundingRate, setLiquidation]);
+        if (message.e === 'depthUpdate' && message.orderbook) {
+          updatedData.orderbook = {
+            bids: message.orderbook.b?.map(([price, qty]: [string, string]) => [parseFloat(price), parseFloat(qty)]) || [],
+            asks: message.orderbook.a?.map(([price, qty]: [string, string]) => [parseFloat(price), parseFloat(qty)]) || [],
+          };
+        }
 
-    return {
-        realtimeData: useRecoilValue(realtimeDataAtom),
-        loading: state.loading,
-        error: state.error,
-        noLiquidationMessage: state.noLiquidationMessage,
+        if (message.e === 'trade' && message.tradeVolume) {
+          const currentTradeVolume = updatedData.tradeVolume || {
+            buy_volume: 0,
+            sell_volume: 0,
+            timestamp: message.tradeVolume.timestamp,
+          };
+          updatedData.tradeVolume = {
+            buy_volume: currentTradeVolume.buy_volume + parseFloat(message.tradeVolume.buy_volume || 0),
+            sell_volume: currentTradeVolume.sell_volume + parseFloat(message.tradeVolume.sell_volume || 0),
+            timestamp: message.tradeVolume.timestamp,
+          };
+          console.log(`Updated tradeVolume for ${symbol}:`, updatedData.tradeVolume); // 디버깅 로그
+        }
+
+        if (message.e === 'forceOrder' && message.liquidation) {
+          updatedData.liquidation = {
+            last_liquidation: message.liquidation.last_liquidation,
+            historicalLiquidation: message.liquidation.historicalLiquidation || [],
+          };
+        }
+
+        return {
+          ...prev,
+          [symbol]: updatedData,
+        };
+      });
+    });
+  }, [messages, isConnected, selectedSymbols, setRealtimeData]);
+
+  // 추가 데이터 (WebSocket에서 제공되지 않는 데이터만 API로 가져오기)
+  useEffect(() => {
+    const fetchAdditionalData = async () => {
+      try {
+        for (const symbol of selectedSymbols) {
+          const [fundingRes, liquidationRes, tradeVolumeRes] = await Promise.all([
+            fetch(`http://localhost:8000/api/realtime/funding_rate/?symbol=${symbol}`),
+            fetch(`http://localhost:8000/api/realtime/liquidation/?symbol=${symbol}`),
+            fetch(`http://localhost:8000/api/realtime/trade_volume/?symbol=${symbol}`),
+          ]);
+
+          const fundingData = await fundingRes.json();
+          const liquidationData = await liquidationRes.json();
+          const tradeVolumeData = await tradeVolumeRes.json();
+
+          setRealtimeData((prev: Record<string, RealtimeData>) => ({
+            ...prev,
+            [symbol]: {
+              ...prev[symbol],
+              fundingRate: fundingData?.fundingRate
+                ? {
+                    fundingRate: parseFloat(fundingData.fundingRate),
+                    fundingTime: fundingData.fundingTime,
+                  }
+                : prev[symbol]?.fundingRate || null,
+              liquidation: liquidationData?.last_liquidation
+                ? {
+                    last_liquidation: liquidationData.last_liquidation,
+                    historicalLiquidation: liquidationData.historicalLiquidation || [],
+                  }
+                : prev[symbol]?.liquidation || null,
+              tradeVolume: tradeVolumeData?.buy_volume
+                ? {
+                    buy_volume: parseFloat(tradeVolumeData.buy_volume),
+                    sell_volume: parseFloat(tradeVolumeData.sell_volume),
+                    timestamp: tradeVolumeData.timestamp,
+                  }
+                : prev[symbol]?.tradeVolume || null,
+            },
+          }));
+        }
+      } catch (err) {
+        setError('Failed to fetch additional real-time data');
+        console.error('Fetch error:', err);
+      }
     };
-};
 
-export default useRealtimeData;
+    fetchAdditionalData();
+    const interval = setInterval(fetchAdditionalData, 10000);
+    return () => clearInterval(interval);
+  }, [selectedSymbols, setRealtimeData]);
+
+  return { realtimeData, error };
+}

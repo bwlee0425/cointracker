@@ -1,456 +1,409 @@
-import React, { useEffect, useState, forwardRef, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { visiblePanelsAtom } from '@/store/atoms';
-import { ResizableBox } from 'react-resizable';
-import Draggable, { DraggableData } from 'react-draggable';
-import { Liquidation } from '../widgets/Liquidation';
-import { TradeVolume } from '../widgets/TradeVolume';
-import { OrderBook } from '../widgets/OrderBook';
-import { FundingRate } from '../widgets/FundingRate';
-import { SymbolSelectorPanel } from '../widgets/SymbolSelectorPanel';
+import { DraggablePanel } from '../panels/DraggablePanel';
+import { ControlPanel } from '../panels/ControlPanel';
+import { PanelState, Preset, PanelData } from '@/types/panels';
+import { 
+  DEFAULT_PANEL_WIDTH, 
+  DEFAULT_PANEL_HEIGHT, 
+  PANEL_COMPONENTS 
+} from '@/constants/panelConstants';
+import { 
+  checkCollision, 
+  snapToEdgesAndGrid, 
+  findNearestSnapPoints, 
+  findNonCollidingPosition,
+  Rect 
+} from '@/utils/panelUtils';
+import { 
+  getPanelStateFromLocalStorage, 
+  getPanelOrderFromLocalStorage, 
+  savePanelStateToLocalStorage 
+} from '@/utils/storageUtils';
+import { DraggableData, DraggableEvent } from 'react-draggable';
 
-const PANEL_COMPONENTS: { [key: string]: React.ReactNode } = {
-    liquidation: <Liquidation />,
-    tradeVolume: <TradeVolume />,
-    orderBook: <OrderBook />,
-    symbolSelector: <SymbolSelectorPanel />,
-    fundingRate: <FundingRate />,
-};
-
-const getPanelStateFromLocalStorage = () => {
-    const savedState = localStorage.getItem('panelState');
-    try {
-        return savedState ? JSON.parse(savedState) : {};
-    } catch (error) {
-        console.error("Error parsing panelState from localStorage:", error);
-        return {};
-    }
-};
-
-const getPanelOrderFromLocalStorage = () => {
-    const savedOrder = localStorage.getItem('panelOrder');
-    try {
-        return savedOrder ? JSON.parse(savedOrder) : [];
-    } catch (error) {
-        console.error("Error parsing panelOrder from localStorage:", error);
-        return [];
-    }
-};
-
-const savePanelStateToLocalStorage = (panelState: any, panelOrder: string[]) => {
-    localStorage.setItem('panelState', JSON.stringify(panelState));
-    localStorage.setItem('panelOrder', JSON.stringify(panelOrder));
-};
-
-const savePresetToLocalStorage = (presetName: string, panelState: any, panelOrder: string[]) => {
-    const presets = JSON.parse(localStorage.getItem('presets') || '[]');
-    presets.push({ name: presetName, state: panelState, order: panelOrder });
-    localStorage.setItem('presets', JSON.stringify(presets));
-};
-
-const loadPresetFromLocalStorage = (presetName: string) => {
-    const presets = JSON.parse(localStorage.getItem('presets') || '[]');
-    const preset = presets.find((p: any) => p.name === presetName);
-    return preset || { state: {}, order: [] };
-};
-
-const deletePresetFromLocalStorage = (presetName: string) => {
-    const presets = JSON.parse(localStorage.getItem('presets') || '[]');
-    const updatedPresets = presets.filter((p: any) => p.name !== presetName);
-    localStorage.setItem('presets', JSON.stringify(updatedPresets));
-};
-
-const GRID_SIZE = 10; // Grid size (20px)
-const MAGNETIC_THRESHOLD = 20; // 마그네틱 효과 발동 거리 (px)
-
-const getPanelColor = (id: string) => {
-    switch (id) {
-        case 'fundingRate': return 'bg-fundingRate';
-        case 'orderBook': return 'bg-orderBook';
-        case 'tradeVolume': return 'bg-tradeVolume';
-        case 'liquidation': return 'bg-liquidation';
-        case 'symbolSelector': return 'bg-symbolSelector';
-        default: return 'bg-gray-800';
-    }
-};
-
-// ✅ Snap and Grid Alignment
-const snapToEdgesAndGrid = (x: number, y: number, width: number, height: number) => {
-    const winW = window.innerWidth;
-    const winH = window.innerHeight;
-
-    let newX = Math.round(x / GRID_SIZE) * GRID_SIZE;
-    let newY = Math.round(y / GRID_SIZE) * GRID_SIZE;
-
-    // Top-left corner
-    if (Math.abs(newX) < 15) newX = 0;
-    if (Math.abs(newY) < 15) newY = 0;
-
-    // Bottom-right corner
-    if (Math.abs(newX + width - winW) < 15) newX = winW - width;
-    if (Math.abs(newY + height - winH) < 15) newY = winH - height;
-
-    return { x: newX, y: newY };
-};
-
-// Define types for DraggablePanelProps
-interface DraggablePanelProps {
-    id: string;
-    panelData: { width: number; height: number; x: number; y: number };
-    handleDragStop: (e: any, data: DraggableData, panelId: string, size: { width: number; height: number }) => void;
-    handleResizeStop: (id: string, newSize: any, currentPosition: { x: number; y: number }) => void;
-    children: React.ReactNode;
-}
-
-// ✅ ForwardRef component with typed props
-const DraggablePanel = forwardRef<HTMLDivElement, DraggablePanelProps>(({ id, panelData, handleDragStop, handleResizeStop, children }, ref) => {
-    const [size, setSize] = useState({ width: panelData.width || 300, height: panelData.height || 200 });
-    const panelRef = useRef<HTMLDivElement | null>(null);
-    const currentPositionRef = useRef({ x: panelData.x || 0, y: panelData.y || 0 });
-
-    const onDrag = (e: any, data: DraggableData) => {
-        currentPositionRef.current = { x: data.x, y: data.y };
-    };
-
-    const onResize = (e: any, data: any) => {
-        setSize(data.size);
-    };
-
-    const onResizeStop = (e: any, data: any) => {
-        handleResizeStop(id, data.size, currentPositionRef.current);
-    };
-
-    return (
-        <Draggable
-            key={id}
-            position={{ x: panelData.x || 0, y: panelData.y || 0 }}
-            onStop={(e: any, data: DraggableData) => handleDragStop(e, data, id, size)}
-            nodeRef={panelRef}
-            bounds="#panel-container"
-            onDrag={onDrag}
-        >
-            <div
-                ref={panelRef}
-                className={`panel ${getPanelColor(id)} transition-transform duration-300 ease-in-out rounded-2xl shadow-md border border-gray-500 p-0`}
-                style={{ position: 'absolute', outline: '3px solid #FFD700' }}
-            >
-                <div className="drag-handle cursor-move bg-gray-700 text-white px-3 py-1 rounded-t-2xl border-b border-gray-600">
-                    {id.toUpperCase()}
-                </div>
-                <ResizableBox
-                    width={size.width}
-                    height={size.height}
-                    minConstraints={[150, 100]}
-                    maxConstraints={[600, 400]}
-                    axis="both"
-                    onResize={onResize}
-                    onResizeStop={onResizeStop}
-                    resizeHandles={['se']}
-                    className="bg-black text-white overflow-hidden border border-gray-600"
-                    handle={
-                        <span
-                            className="react-resizable-handle"
-                            style={{
-                                position: 'absolute',
-                                width: 20,
-                                height: 20,
-                                bottom: 0,
-                                right: 0,
-                                background: 'rgba(255,255,255,0.5)',
-                                cursor: 'se-resize',
-                                zIndex: 10,
-                                borderRadius: 4,
-                            }}
-                        />
-                    }
-                >
-                    <div className="p-2" style={{ position: 'relative' }}>
-                        {children}
-                    </div>
-                </ResizableBox>
-            </div>
-        </Draggable>
-    );
-});
-
+// 메인 패널 레이아웃 컴포넌트
 export const PanelLayout: React.FC = () => {
-    const visiblePanels = useRecoilValue(visiblePanelsAtom);
-    const setVisiblePanels = useSetRecoilState(visiblePanelsAtom);
-    const [panelState, setPanelState] = useState(getPanelStateFromLocalStorage);
-    const [panelOrder, setPanelOrder] = useState(getPanelOrderFromLocalStorage);
-    const [presets, setPresets] = useState(() => JSON.parse(localStorage.getItem('presets') || '[]'));
+  const visiblePanels = useRecoilValue(visiblePanelsAtom);
+  const setVisiblePanels = useSetRecoilState(visiblePanelsAtom);
+  const [panelState, setPanelState] = useState<PanelState>(getPanelStateFromLocalStorage);
+  const [panelOrder, setPanelOrder] = useState<string[]>(getPanelOrderFromLocalStorage);
+  const [presets, setPresets] = useState<Preset[]>(() => {
+    const savedPresets = localStorage.getItem('presets');
+    return savedPresets ? JSON.parse(savedPresets) : [];
+  });
+  const [zIndexes, setZIndexes] = useState<{[key: string]: number}>({});
 
-    useEffect(() => {
-        console.log("PanelLayout Mount 또는 visiblePanels 변경됨:", visiblePanels);
-        const needsInit = visiblePanels.some((id) => !panelState[id]?.x && !panelState[id]?.y);
-        console.log("초기 위치 설정 필요:", needsInit);
-        if (!needsInit) return;
+  // 패널을 맨 앞으로 가져오는 함수
+  const bringToFront = useCallback((id: string) => {
+    setZIndexes(prev => {
+      const maxZ = Math.max(0, ...Object.values(prev));
+      return { ...prev, [id]: maxZ + 1 };
+    });
+  }, []);
 
-        const newState = { ...panelState };
-        const W = 300, H = 200, GAP_X = 20, GAP_Y = 20, COLS = 3;
-
-        visiblePanels.forEach((id, i) => {
-            if (newState[id]?.x || newState[id]?.y) return;
-            const col = i % COLS;
-            const row = Math.floor(i / COLS);
-            newState[id] = { x: 50 + col * (W + GAP_X), y: 50 + row * (H + GAP_Y), width: W, height: H };
-            console.log(`초기 패널 위치 설정 - ${id}:`, newState[id]);
-        });
-
-        setPanelState(newState);
-        if (panelOrder.length === 0) {
-            setPanelOrder(visiblePanels);
-            console.log("초기 패널 순서 설정:", visiblePanels);
-        }
-    }, [visiblePanels, panelState, panelOrder]);
-
-    useEffect(() => {
-        console.log("panelState 또는 panelOrder 변경됨:", panelState, panelOrder);
-        savePanelStateToLocalStorage(panelState, panelOrder);
-    }, [panelState, panelOrder]);
-
-    useEffect(() => {
-        localStorage.setItem('presets', JSON.stringify(presets));
-    }, [presets]);
-
-    const checkCollision = (rect1: { left: number; top: number; right: number; bottom: number }, rect2: { left: number; top: number; right: number; bottom: number }) => {
-        return !(rect1.right < rect2.left || rect1.left > rect2.right || rect1.bottom < rect2.top || rect1.top > rect2.bottom);
-    };
-
-    const findNearestSnapPoints = (currentRect: { left: number; top: number; right: number; bottom: number }, otherPanels: any) => {
-        const snapPoints: { distance: number; x?: number; y?: number }[] = [];
-
-        otherPanels.forEach((otherId) => {
-            const otherPanelData = panelState[otherId];
-            if (otherPanelData) {
-                const otherRect = {
-                    left: otherPanelData.x,
-                    top: otherPanelData.y,
-                    right: otherPanelData.x + otherPanelData.width,
-                    bottom: otherPanelData.y + otherPanelData.height,
-                };
-
-                // 좌우 스냅 포인트
-                let distance = Math.abs(currentRect.right - otherRect.left);
-                if (distance < MAGNETIC_THRESHOLD) snapPoints.push({ distance, x: otherRect.left - (currentRect.right - currentRect.left) });
-                distance = Math.abs(currentRect.left - otherRect.right);
-                if (distance < MAGNETIC_THRESHOLD) snapPoints.push({ distance, x: otherRect.right });
-
-                // 상하 스냅 포인트
-                distance = Math.abs(currentRect.bottom - otherRect.top);
-                if (distance < MAGNETIC_THRESHOLD) snapPoints.push({ distance, y: otherRect.top - (currentRect.bottom - currentRect.top) });
-                distance = Math.abs(currentRect.top - otherRect.bottom);
-                if (distance < MAGNETIC_THRESHOLD) snapPoints.push({ distance, y: otherRect.bottom });
-            }
-        });
-
-        snapPoints.sort((a, b) => a.distance - b.distance);
-        return snapPoints.length > 0 ? snapPoints[0] : null;
-    };
-
-    const applyMagneticEffect = (currentRect: { left: number; top: number }, snapPoint: { x?: number; y?: number }) => {
-        const newPosition = { ...currentRect };
-        if (snapPoint?.x !== undefined) newPosition.left = snapPoint.x;
-        if (snapPoint?.y !== undefined) newPosition.top = snapPoint.y;
-        return newPosition;
-    };
-
-    const handleDragStop = (e: any, data: any, panelId: string, size: { width: number; height: number }) => {
-        const snapped = snapToEdgesAndGrid(data.x, data.y, size.width, size.height);
-        const currentRect = { left: snapped.x, top: snapped.y, right: snapped.x + size.width, bottom: snapped.y + size.height };
-        const otherPanels = visiblePanels.filter((id) => id !== panelId);
-        const snapPoint = findNearestSnapPoints(currentRect, otherPanels);
-        let finalPosition = { left: snapped.x, top: snapped.y };
-
-        if (snapPoint) {
-            finalPosition = applyMagneticEffect(currentRect, snapPoint);
-        }
-
-        // 최종 위치에서 겹침 검사
-        let collision = false;
-        const finalRect = { ...currentRect, left: finalPosition.left, top: finalPosition.top, right: finalPosition.left + size.width, bottom: finalPosition.top + size.height };
-        otherPanels.forEach((otherId) => {
-            const otherPanelData = panelState[otherId];
-            if (otherPanelData && checkCollision(finalRect, { left: otherPanelData.x, top: otherPanelData.y, right: otherPanelData.x + otherPanelData.width, bottom: otherPanelData.y + otherPanelData.height })) {
-                collision = true;
-            }
-        });
-
-        setPanelState((prevState: any) => {
-            const updatedState = {
-                ...prevState,
-                [panelId]: {
-                    ...prevState[panelId],
-                    x: collision ? prevState[panelId].x : finalPosition.left,
-                    y: collision ? prevState[panelId].y : finalPosition.top,
-                    width: size.width,
-                    height: size.height,
-                },
-            };
-            console.log(`패널 드래그 종료 - ${panelId}:`, updatedState[panelId]);
-            return updatedState;
-        });
-    };
-
-    const handleResizeStop = (id: string, newSize: any, currentPosition: { x: number; y: number }) => {
-        const currentRect = { left: currentPosition.x, top: currentPosition.y, right: currentPosition.x + newSize.width, bottom: currentPosition.y + newSize.height };
-        const otherPanels = visiblePanels.filter((otherId) => otherId !== id);
-        let collision = false;
-
-        otherPanels.forEach((otherId) => {
-            const otherPanelData = panelState[otherId];
-            if (otherPanelData && checkCollision(currentRect, { left: otherPanelData.x, top: otherPanelData.y, right: otherPanelData.x + otherPanelData.width, bottom: otherPanelData.y + otherPanelData.height })) {
-                collision = true;
-                return; // 하나라도 충돌하면 더 이상 검사할 필요 없음
-            }
-        });
-
-        if (collision) {
-            // 충돌 발생 시 이전 상태로 되돌림 (크기만)
-            setPanelState((prevState: any) => ({
-                ...prevState,
-                [id]: {
-                    ...prevState[id],
-                    // 위치는 그대로 유지하고 크기만 되돌림
-                    width: prevState[id].width,
-                    height: prevState[id].height,
-                },
-            }));
-            console.log(`패널 리사이즈 충돌 - ${id}: 이전 크기로 복원`);
-        } else {
-            // 충돌 없으면 새로운 크기 적용
-            setPanelState((prevState: any) => ({
-                ...prevState,
-                [id]: {
-                    ...prevState[id],
-                    width: newSize.width,
-                    height: newSize.height,
-                },
-            }));
-            console.log(`패널 리사이즈 종료 - ${id}:`, { width: newSize.width, height: newSize.height });
-        }
-    };
-
-    const savePreset = () => {
-        const presetName = prompt('Enter preset name:');
-        if (presetName) {
-            console.log("프리셋 저장 시도:", presetName, panelState, panelOrder);
-            const newPreset = { name: presetName, state: panelState, order: panelOrder };
-            setPresets((prevPresets) => [...prevPresets, newPreset]);
-            savePresetToLocalStorage(presetName, panelState, panelOrder); // localStorage에도 저장
-        }
-    };
-
-    const loadPreset = (presetName: string) => {
-        console.log("프리셋 로드 시도:", presetName);
-        const preset = presets.find((p: any) => p.name === presetName);
-        if (preset) {
-            console.log("로드된 프리셋:", preset.state, preset.order);
-            setPanelState(preset.state);
-            setPanelOrder(preset.order);
-        } else {
-            // 로컬 스토리지에서 직접 로드
-            const loadedPreset = loadPresetFromLocalStorage(presetName);
-            if (loadedPreset) {
-                setPanelState(loadedPreset.state);
-                setPanelOrder(loadedPreset.order);
-            }
-        }
-    };
-
-    const deletePreset = (presetName: string) => {
-        console.log("프리셋 삭제 시도:", presetName);
-        setPresets((prevPresets) => prevPresets.filter((p: any) => p.name !== presetName));
-        deletePresetFromLocalStorage(presetName);
-    };
-
-    const resetSettings = () => {
-        console.log('Reset 버튼 클릭됨!');
-        const initialPanelState: any = {};
-        const initialPanelOrder: string[] = visiblePanels;
-
-        const W = 300, H = 200, GAP_X = 20, GAP_Y = 20, COLS = 3;
-        visiblePanels.forEach((id, i) => {
-            const col = i % COLS;
-            const row = Math.floor(i / COLS);
-            initialPanelState[id] = { x: 50 + col * (W + GAP_X), y: 50 + row * (H + GAP_Y), width: W, height: H };
-        });
-
-        setPanelState(initialPanelState);
-        setPanelOrder(initialPanelOrder);
-        setVisiblePanels(visiblePanels);
-
-        localStorage.removeItem('panelState');
-        localStorage.removeItem('panelOrder');
-        localStorage.removeItem('presets'); // Remove presets from local storage
-        setPresets([]); // Clear the presets state
-        console.log("상태 초기화 및 localStorage 제거됨");
-    };
-
-    return (
-        <div className="w-full h-screen relative overflow-hidden bg-[#121212]" id="panel-container">
-            {/* Save Preset Button */}
-            <button
-                onClick={savePreset}
-                className="absolute top-5 px-4 py-2 bg-blue-600 text-white rounded-xl z-20"
-                style={{ left: '10px', backgroundColor: 'white', color: 'black', padding: '10px' }}
-            >
-                Save Preset
-            </button>
-
-            {/* Load Presets Dropdown */}
-            <div className="absolute top-5 px-4 py-2 rounded-xl z-10"
-                style={{ left: '125px', backgroundColor: 'white', color: 'black', padding: '8px' }}
-            >
-                Load Presets:
-                <select onChange={(e) => loadPreset(e.target.value)} className="ml-2">
-                    <option value="">Select preset</option>
-                    {presets.map((preset: any) => (
-                        <option key={preset.name} value={preset.name}>
-                            {preset.name}
-                        </option>
-                    ))}
-                </select>
-                {presets.length > 0 && (
-                    <div className="mt-2">
-                        {presets.map((preset: any) => (
-                            <div key={preset.name} className="flex items-center justify-between py-1">
-                                <span className="text-sm">{preset.name}</span>
-                                <button
-                                    onClick={() => deletePreset(preset.name)}
-                                    className="ml-2 px-2 py-1 bg-red-500 text-white rounded-md text-xs"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Reset Settings Button */}
-            <button
-                onClick={resetSettings}
-                className="absolute top-5 px-4 py-2 bg-red-600 text-white rounded-xl z-20"
-                style={{ left: '375px', backgroundColor: 'white', color: 'black', padding: '10px' }}
-            >
-                Reset Settings
-            </button>
-
-            {/* Draggable Panels */}
-            {panelOrder.map((id) => (
-                visiblePanels.includes(id) && (
-                    <DraggablePanel
-                        key={id}
-                        id={id}
-                        panelData={panelState[id]}
-                        handleDragStop={handleDragStop}
-                        handleResizeStop={handleResizeStop}
-                    >
-                        {PANEL_COMPONENTS[id]}
-                    </DraggablePanel>
-                )
-            ))}
-        </div>
+  // 패널 초기 위치 설정
+  useEffect(() => {
+    // 패널 상태에 visible 패널이 없거나 초기화 필요한지 확인
+    const needsInit = visiblePanels.some((id) => 
+      !panelState[id] || (panelState[id] && (panelState[id].x === undefined || panelState[id].y === undefined))
     );
+    
+    if (!needsInit) {
+      // zIndex 초기화 (패널 순서에 따라)
+      const newZIndexes: {[key: string]: number} = {};
+      panelOrder.forEach((id, idx) => {
+        if (visiblePanels.includes(id)) {
+          newZIndexes[id] = idx + 1;
+        }
+      });
+      setZIndexes(newZIndexes);
+      return;
+    }
+
+    console.log("패널 초기 위치 설정 필요");
+    
+    const newState = { ...panelState };
+    const W = DEFAULT_PANEL_WIDTH, H = DEFAULT_PANEL_HEIGHT;
+    const COLS = 3;
+    const newZIndexes: {[key: string]: number} = {};
+
+    visiblePanels.forEach((id, i) => {
+      if (newState[id]?.x !== undefined && newState[id]?.y !== undefined) {
+        newZIndexes[id] = i + 1;
+        return;
+      }
+      
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      
+      // 패널을 정확히 붙이기 위해 위치 계산
+      newState[id] = { 
+        x: col * W, 
+        y: 30 + row * H, 
+        width: W, 
+        height: H 
+      };
+      
+      newZIndexes[id] = i + 1;
+      console.log(`패널 초기 위치 설정 - ${id}:`, newState[id]);
+    });
+
+    setPanelState(newState);
+    setZIndexes(newZIndexes);
+    
+    if (panelOrder.length === 0 || visiblePanels.some(id => !panelOrder.includes(id))) {
+      setPanelOrder([...visiblePanels]);
+    }
+  }, [visiblePanels]); // 의존성에서 panelState와 panelOrder 제거
+
+  // localStorage에 패널 상태 저장 - 에러 처리 추가
+  useEffect(() => {
+    try {
+      if (Object.keys(panelState).length > 0 && panelOrder.length > 0) {
+        savePanelStateToLocalStorage(panelState, panelOrder);
+      }
+    } catch (error) {
+      console.error("Failed to save panel state:", error);
+    }
+  }, [panelState, panelOrder]);
+
+  // localStorage에 프리셋 저장
+  useEffect(() => {
+    localStorage.setItem('presets', JSON.stringify(presets));
+  }, [presets]);
+
+  // 매그네틱 효과 적용
+  const applyMagneticEffect = (currentRect: Rect, snapPoint: { x?: number; y?: number }) => {
+    const newPosition = { left: currentRect.left, top: currentRect.top };
+    if (snapPoint?.x !== undefined) newPosition.left = snapPoint.x;
+    if (snapPoint?.y !== undefined) newPosition.top = snapPoint.y;
+    return newPosition;
+  };
+
+  // 드래그 종료 처리
+  const handleDragStop = (
+    e: DraggableEvent, 
+    data: DraggableData, 
+    panelId: string, 
+    size: { width: number; height: number }
+  ) => {
+    // 그리드에 맞추고 화면 가장자리에 스냅
+    const snapped = snapToEdgesAndGrid(data.x, data.y, size.width, size.height);
+    
+    // 현재 패널의 영역 계산
+    const currentRect: Rect = { 
+      left: snapped.x, 
+      top: snapped.y, 
+      right: snapped.x + size.width, 
+      bottom: snapped.y + size.height 
+    };
+    
+    // 다른 패널들의 목록
+    const otherPanels = visiblePanels.filter((id) => id !== panelId);
+    
+    // 매그네틱 효과를 위한 가장 가까운 스냅 포인트 찾기
+    const snapPoint = findNearestSnapPoints(currentRect, otherPanels, panelState);
+    let finalPosition = { left: snapped.x, top: snapped.y };
+
+    // 매그네틱 효과 적용
+    if (snapPoint) {
+      finalPosition = applyMagneticEffect(currentRect, snapPoint);
+    }
+
+    // 최종 위치에서 충돌 검사
+    let collision = false;
+    const finalRect: Rect = { 
+      left: finalPosition.left, 
+      top: finalPosition.top, 
+      right: finalPosition.left + size.width, 
+      bottom: finalPosition.top + size.height 
+    };
+    
+    otherPanels.forEach((otherId) => {
+      const otherPanelData = panelState[otherId];
+      if (otherPanelData) {
+        const otherRect: Rect = { 
+          left: otherPanelData.x, 
+          top: otherPanelData.y, 
+          right: otherPanelData.x + otherPanelData.width, 
+          bottom: otherPanelData.y + otherPanelData.height 
+        };
+        
+        if (checkCollision(finalRect, otherRect)) {
+          collision = true;
+        }
+      }
+    });
+
+    // 상태 업데이트
+    setPanelState((prevState) => {
+      let newPosition = { x: finalPosition.left, y: finalPosition.top };
+      
+      // 충돌이 발생한 경우 충돌하지 않는 위치 찾기
+      if (collision) {
+        newPosition = findNonCollidingPosition(
+          panelId,
+          { x: finalPosition.left, y: finalPosition.top },
+          size,
+          visiblePanels,
+          prevState
+        );
+      }
+      
+      const updatedState = {
+        ...prevState,
+        [panelId]: {
+          ...prevState[panelId],
+          x: newPosition.x,
+          y: newPosition.y,
+          width: size.width,
+          height: size.height,
+        },
+      };
+      
+      console.log(`패널 드래그 종료 - ${panelId}:`, updatedState[panelId]);
+      return updatedState;
+    });
+  };
+
+  // 핸들러 함수 업데이트 - 패널 리사이즈 종료
+  const handleResizeStop = (
+    id: string, 
+    newSize: { width: number; height: number }, 
+    currentPosition: { x: number; y: number }
+  ) => {
+    setPanelState((prevState) => {
+      // 이전 상태가 없는 경우 기본값 사용
+      if (!prevState || !prevState[id]) {
+        return {
+          ...prevState,
+          [id]: {
+            x: currentPosition.x,
+            y: currentPosition.y,
+            width: newSize.width,
+            height: newSize.height,
+          }
+        };
+      }
+    
+      // 충돌 검사
+      const currentRect: Rect = {
+        left: currentPosition.x,
+        top: currentPosition.y,
+        right: currentPosition.x + newSize.width,
+        bottom: currentPosition.y + newSize.height
+      };
+      
+      let collision = false;
+      const otherPanels = visiblePanels.filter(panelId => panelId !== id);
+      
+      otherPanels.forEach(otherId => {
+        const otherData = prevState[otherId];
+        if (!otherData) return;
+        
+        const otherRect: Rect = {
+          left: otherData.x,
+          top: otherData.y,
+          right: otherData.x + otherData.width,
+          bottom: otherData.y + otherData.height
+        };
+        
+        if (checkCollision(currentRect, otherRect)) {
+          collision = true;
+        }
+      });
+      
+      // 새 크기 적용, 충돌이 있어도 사이즈 변경 허용
+      return {
+        ...prevState,
+        [id]: {
+          ...prevState[id],
+          width: newSize.width,
+          height: newSize.height,
+          x: currentPosition.x,
+          y: currentPosition.y,
+        },
+      };
+    });
+    
+    // 패널을 최상위로 가져오기
+    bringToFront(id);
+  };
+
+  // 프리셋 저장
+  const savePreset = () => {
+    const presetName = prompt('Enter preset name:');
+    if (!presetName) return;
+    
+    console.log("프리셋 저장:", presetName);
+    
+    const newPreset: Preset = { 
+      name: presetName, 
+      state: panelState, 
+      order: panelOrder 
+    };
+    
+    setPresets(prevPresets => [...prevPresets, newPreset]);
+  };
+
+  // 프리셋 로드
+  const loadPreset = (presetName: string) => {
+    if (!presetName) return; // 빈 값 선택 시 무시
+    
+    console.log("프리셋 로드:", presetName);
+    const preset = presets.find(p => p.name === presetName);
+    
+    if (preset) {
+      console.log("로드된 프리셋:", preset.state, preset.order);
+      setPanelState(preset.state);
+      setPanelOrder(preset.order);
+      
+      // Recoil 상태 업데이트 (visible 패널 설정)
+      const newVisiblePanels = [...preset.order].filter(id => 
+        preset.state[id] && 
+        (preset.state[id].x !== undefined || preset.state[id].y !== undefined)
+      );
+      
+      if (newVisiblePanels.length > 0) {
+        setVisiblePanels(newVisiblePanels);
+      }
+      
+      // zIndex 초기화
+      const newZIndexes: {[key: string]: number} = {};
+      preset.order.forEach((id, idx) => {
+        if (newVisiblePanels.includes(id)) {
+          newZIndexes[id] = idx + 1;
+        }
+      });
+      setZIndexes(newZIndexes);
+    }
+  };
+
+  // 프리셋 삭제
+  const deletePreset = (presetName: string) => {
+    console.log("프리셋 삭제:", presetName);
+    setPresets(prevPresets => prevPresets.filter(p => p.name !== presetName));
+  };
+
+  // 설정 초기화
+  const resetSettings = useCallback(() => {
+    console.log('설정 초기화');
+    
+    // 기본 패널 설정 생성
+    const initialPanelState: PanelState = {};
+    const initialPanelOrder: string[] = [...visiblePanels];
+    const newZIndexes: {[key: string]: number} = {};
+
+    const W = DEFAULT_PANEL_WIDTH;
+    const H = DEFAULT_PANEL_HEIGHT;
+    const COLS = 3;
+    
+    visiblePanels.forEach((id, i) => {
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      
+      initialPanelState[id] = { 
+        x: col * W, 
+        y: 30 + row * H, 
+        width: W, 
+        height: H 
+      };
+      
+      newZIndexes[id] = i + 1;
+    });
+
+    // 상태 업데이트
+    setPanelState(initialPanelState);
+    setPanelOrder(initialPanelOrder);
+    setZIndexes(newZIndexes);
+
+    // localStorage 초기화
+    localStorage.removeItem('panelState');
+    localStorage.removeItem('panelOrder');
+    localStorage.removeItem('presets');
+    setPresets([]);
+    
+    console.log("상태 초기화 및 localStorage 제거 완료");
+  }, [visiblePanels, setVisiblePanels]);
+
+  return (
+    <div className="w-full h-screen relative overflow-hidden bg-[#121212]" id="panel-container">
+      {/* 컨트롤 패널 */}
+      <ControlPanel 
+        presets={presets}
+        savePreset={savePreset}
+        loadPreset={loadPreset}
+        resetSettings={resetSettings}
+        deletePreset={deletePreset}
+      />
+
+      {/* 드래그 가능한 패널들 */}
+      {panelOrder
+        .filter(id => visiblePanels.includes(id))
+        .map((id) => {
+          const panelData: PanelData = panelState[id] || { 
+            x: 0, 
+            y: 0, 
+            width: DEFAULT_PANEL_WIDTH, 
+            height: DEFAULT_PANEL_HEIGHT 
+          };
+          
+          return (
+            <DraggablePanel
+              key={id}
+              id={id}
+              panelData={panelData}
+              handleDragStop={handleDragStop}
+              handleResizeStop={handleResizeStop}
+              zIndex={zIndexes[id] || 1}
+              bringToFront={bringToFront}
+            >
+              {PANEL_COMPONENTS[id]}
+            </DraggablePanel>
+          );
+        })}
+    </div>
+  );
 };

@@ -1,3 +1,4 @@
+// src/store/atoms.ts
 import { atom } from 'recoil';
 import {
   HistoricalData,
@@ -5,10 +6,10 @@ import {
   TradeVolumeResponse,
   OrderbookResponse,
   FundingRateResponse,
-  LiquidationItem
+  LiquidationItem,
 } from '@/types/api';
 
-// 과거 데이터
+// 과거 데이터 (변동 없음)
 export const historicalDataAtom = atom<any>({
   key: 'historicalDataAtom',
   default: {
@@ -19,35 +20,34 @@ export const historicalDataAtom = atom<any>({
   },
 });
 
-// 실시간 데이터
-export const realtimeDataAtom = atom<RealtimeData>({
+// ✅ 실시간 데이터 (Record 형태로 변경)
+export const realtimeDataAtom = atom<Record<string, RealtimeData>>({
   key: 'realtimeDataAtom',
-  default: {
-    orderbook: { b: [], a: [] },
-    fundingRate: null,
-    tradeVolume: { buy_volume: 0, sell_volume: 0, timestamp: '' },
-    liquidation: { last_liquidation: null, historicalLiquidation: [] },
-  },
+  default: {},
 });
 
-export const orderbookDataAtom = atom<OrderbookResponse | null>({
+// ✅ 개별 Orderbook 데이터 (Record 형태로 변경)
+export const orderbookDataAtom = atom<Record<string, RealtimeData['orderbook'] | null>>({
   key: 'orderbookDataAtom',
-  default: null,
+  default: {},
 });
 
-export const fundingRateState = atom<FundingRateResponse | null>({
+// ✅ 개별 Funding Rate 데이터 (Record 형태로 변경)
+export const fundingRateState = atom<Record<string, RealtimeData['fundingRate'] | null>>({
   key: 'fundingRateState',
-  default: null,
+  default: {},
 });
 
-export const tradeVolumeState = atom<TradeVolumeResponse | null>({
+// ✅ 개별 Trade Volume 데이터 (Record 형태로 변경)
+export const tradeVolumeState = atom<Record<string, RealtimeData['tradeVolume'] | null>>({
   key: 'tradeVolumeState',
-  default: null,
+  default: {},
 });
 
-export const liquidationDataAtom = atom<LiquidationItem | null>({
+// ✅ 개별 Liquidation 데이터 (Record 형태로 변경)
+export const liquidationDataAtom = atom<Record<string, RealtimeData['liquidation'] | null>>({
   key: 'liquidationDataAtom',
-  default: null,
+  default: {},
 });
 
 export const noLiquidationMessageAtom = atom({
@@ -55,15 +55,16 @@ export const noLiquidationMessageAtom = atom({
   default: '',
 });
 
-// ✅ 심볼 목록 (초기값을 빈 배열로 수정)
+// ✅ 심볼 목록 (유지)
 export const symbolsAtom = atom<string[]>({
   key: 'symbolsAtom',
-  default: [], // 이전: ['BTCUSDT']
+  default: [],
 });
 
-export const selectedSymbolAtom = atom<string>({
-  key: 'selectedSymbolAtom',
-  default: 'BTCUSDT',
+// ✅ 단일 심볼 → 다중 심볼 배열로 변경
+export const selectedSymbolsAtom = atom<string[]>({
+  key: 'selectedSymbolsAtom',
+  default: ['BTCUSDT'],
 });
 
 export const visiblePanelsAtom = atom<string[]>({

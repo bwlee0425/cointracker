@@ -5,19 +5,20 @@ import { AlertCircle, Sun, Moon } from 'lucide-react';
 import { useTheme } from './hooks/useTheme';
 import useRealtimeData from './hooks/useRealtimeData';
 import useHistoricalData from './hooks/useHistoricalData';
-import { useRecoilState } from 'recoil';
-import { selectedSymbolAtom } from './store/atoms';
-import { useSymbols } from './hooks/useSymbols'; // ✅ 추가
+import { useRecoilState, useRecoilValue } from 'recoil';
+import { selectedSymbolsAtom, orderbookDataAtom } from './store/atoms'; // selectedSymbolsAtom 사용
+import { useSymbols } from './hooks/useSymbols';
 import { PanelLayout } from './components/layout/PanelLayout';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 
 const App: React.FC = () => {
-  useSymbols(); // ✅ symbols 불러오기 (setSymbols은 useSymbols 내부에서 처리됨)
+  useSymbols(); // 심볼 목록 로드
 
-  const [selectedSymbol] = useRecoilState(selectedSymbolAtom);
-  const { error } = useRealtimeData(selectedSymbol);
+  const [selectedSymbols] = useRecoilState(selectedSymbolsAtom);
+  const { realtimeData, error } = useRealtimeData(selectedSymbols);
+  const orderbook = useRecoilValue(orderbookDataAtom); // 디버깅용
   useHistoricalData();
 
   const { theme, toggleTheme } = useTheme();
@@ -35,10 +36,7 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container min-h-screen w-screen bg-background text-foreground flex flex-col">
-      {/* Header 영역 */}
       <Header />
-
-      {/* 상단 바 - 타이틀 및 다크모드 토글 */}
       <div className="flex justify-between items-center p-4 border-b border-muted">
         <h1 className="text-xl font-bold">Crypto Info</h1>
         <button
@@ -49,16 +47,15 @@ const App: React.FC = () => {
           <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
       </div>
-
-      {/* 메인 영역 */}
       <div className="flex flex-grow overflow-hidden">
         <Sidebar />
         <main className="flex-grow overflow-auto p-4 space-y-4">
+          <pre className="text-sm bg-gray-800 p-4 rounded">
+            Orderbook Data: {JSON.stringify(orderbook, null, 2)}
+          </pre>
           <PanelLayout />
         </main>
       </div>
-
-      {/* Footer 영역 */}
       <Footer />
     </div>
   );

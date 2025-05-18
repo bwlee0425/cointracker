@@ -1,3 +1,4 @@
+# config/celery.py
 import os
 from celery import Celery
 from celery.schedules import crontab
@@ -15,10 +16,6 @@ app.conf.beat_schedule = {
     },
     'fetch-open-interest-every-5-min': {
         'task': 'data_collection.tasks.fetch_open_interest',
-        'schedule': crontab(minute='*/5'),
-    },
-    'fetch-orderbook-every-5-min': {
-        'task': 'data_collection.tasks.fetch_orderbook',
         'schedule': crontab(minute='*/5'),
     },
 }

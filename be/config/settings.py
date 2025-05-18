@@ -35,6 +35,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 # CORS 설정
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',  # Vite 프론트엔드 포트
+    'ws://localhost:5173',
 ]
 
 # 디버그용 (임시)
@@ -55,6 +56,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'django_celery_beat',
     'data_collection',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -152,6 +154,19 @@ TEMPLATES = [
         },
     },
 ]
+
+# Channels 설정
+ASGI_APPLICATION = 'config.asgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [os.getenv('REDIS_URL')],
+            'capacity': 150,  # 기본값 100 → 150으로 증가
+            'expiry': 10,  # 메시지 만료 시간 (초)
+        },
+    },
+}
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
